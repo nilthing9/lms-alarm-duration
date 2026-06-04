@@ -67,10 +67,7 @@ sub alarmFired {
     if (defined $duration && $duration > 0) {
         $log->info("AlarmDuration: alarm $alarmId - setting sleep timer to $duration seconds");
 
-        $client->sleepTime(Time::HiRes::time() + $duration);
-        $client->currentSleepTime($duration / 60);
-
-        Slim::Control::Request::notifyFromArray(
+        Slim::Control::Request::executeRequest(
             $client,
             ['sleep', $duration]
         );
