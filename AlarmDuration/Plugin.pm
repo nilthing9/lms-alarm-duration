@@ -6,6 +6,7 @@ use base qw(Slim::Plugin::Base);
 use Slim::Utils::Log;
 use Slim::Utils::Prefs;
 use Slim::Utils::Alarm;
+use Slim::Utils::Timers;
 use Plugins::AlarmDuration::Settings;
 
 my $log = Slim::Utils::Log->addLogCategory({
@@ -62,16 +63,21 @@ sub alarmFired {
         );
     }
 
-    # Apply per-alarm sleep duration
+    # Apply per-alarm sleep duration via a direct timer — immune to stream reconnects
+    # resetting the sleep command (BBC Sounds reconnects hourly and would clear it)
     my $duration = $durations->{$alarmId};
     if (defined $duration && $duration > 0) {
-        $log->info("AlarmDuration: alarm $alarmId - setting sleep timer to $duration seconds");
+        $log->info("AlarmDuration: alarm $alarmId - scheduling power off in $duration seconds");
 
-        Slim::Control::Request::executeRequest(
-            $client,
-            ['sleep', $duration]
-        );
+        Slim::Utils::Timers::killTimers($client, \&_powerOffPlayer);
+        Slim::Utils::Timers::setTimer($client, Time::HiRes::time() + $duration, \&_powerOffPlayer);
     }
+}
+
+sub _powerOffPlayer {
+    my $client = shift;
+    $log->info("AlarmDuration: alarm duration elapsed - powering off player");
+    Slim::Control::Request::executeRequest($client, ['power', '0']);
 }
 
 sub playerSleeping {
